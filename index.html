@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PixelVault — Password-Protected Data Hiding in Images</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#101A26;
+    --paper:#E9EDF1;
+    --panel:#FFFFFF;
+    --line:#C6D0D9;
+    --muted:#5A6B7C;
+    --accent:#3B2FC9;
+    --accent-soft:#E7E5FB;
+    --good:#15803D;
+    --bad:#B3261E;
+    --radius:4px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,sans-serif;
+    font-size:15px;
+    line-height:1.55;
+  }
+  .wrap{max-width:1060px;margin:0 auto;padding:32px 20px 64px;}
+
+  header{border-bottom:2px solid var(--ink);padding-bottom:18px;margin-bottom:28px;}
+  header h1{
+    font-size:38px;font-weight:600;letter-spacing:-0.02em;margin:0 0 6px;
+  }
+  header h1 span{
+    font-family:"IBM Plex Mono",monospace;font-weight:400;
+    color:var(--accent);
+  }
+  header p{margin:0;color:var(--muted);max-width:62ch;}
+
+  .tabs{display:flex;gap:2px;margin-bottom:22px;}
+  .tabs button{
+    font:inherit;font-weight:500;cursor:pointer;
+    background:transparent;border:1px solid var(--line);border-bottom:2px solid var(--ink);
+    padding:10px 22px;color:var(--muted);border-radius:var(--radius) var(--radius) 0 0;
+  }
+  .tabs button[aria-selected="true"]{
+    background:var(--panel);color:var(--ink);border-color:var(--ink);border-bottom-color:var(--panel);
+  }
+  .tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start;}
+  @media (max-width:800px){.grid{grid-template-columns:1fr;}}
+
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:20px;}
+  .panel h2{font-size:17px;font-weight:600;margin:0 0 14px;}
+
+  label{display:block;font-size:13px;color:var(--muted);margin:14px 0 5px;}
+  label:first-of-type{margin-top:0;}
+  input[type=file],input[type=password],textarea{
+    width:100%;font:inherit;padding:9px 11px;
+    border:1px solid var(--line);border-radius:var(--radius);background:#FBFCFD;color:var(--ink);
+  }
+  input[type=file]{padding:7px;}
+  textarea{min-height:110px;resize:vertical;}
+  input:focus,textarea:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent);}
+
+  .action{
+    margin-top:18px;width:100%;font:inherit;font-weight:600;cursor:pointer;
+    background:var(--accent);color:#fff;border:none;padding:12px;border-radius:var(--radius);
+  }
+  .action:hover{background:#2F25A8;}
+  .action:disabled{background:#9AA4AE;cursor:not-allowed;}
+  .action:focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
+
+  .preview{
+    margin-top:16px;border:1px solid var(--line);border-radius:var(--radius);
+    background:repeating-conic-gradient(#F4F6F8 0% 25%, #E6EAEE 0% 50%) 50%/16px 16px;
+    min-height:150px;display:flex;align-items:center;justify-content:center;padding:10px;
+  }
+  .preview img{max-width:100%;max-height:260px;display:block;}
+  .preview p{color:var(--muted);font-size:13px;margin:0;}
+
+  .meter{height:8px;background:var(--accent-soft);border-radius:99px;overflow:hidden;margin-top:10px;}
+  .meter div{height:100%;background:var(--accent);width:0;transition:width .25s;}
+
+  .readout{
+    font-family:"IBM Plex Mono",monospace;font-size:12.5px;line-height:1.75;
+    background:#F5F7F9;border:1px solid var(--line);border-radius:var(--radius);
+    padding:12px;margin-top:16px;white-space:pre-wrap;word-break:break-all;color:var(--ink);
+    max-height:260px;overflow:auto;
+  }
+  .readout:empty{display:none;}
+
+  .status{margin-top:14px;font-weight:500;}
+  .status.ok{color:var(--good);}
+  .status.err{color:var(--bad);}
+
+  .secret{
+    width:100%;min-height:130px;font-family:"IBM Plex Mono",monospace;font-size:14px;
+    padding:11px;border:1px solid var(--line);border-radius:var(--radius);background:#FBFCFD;
+  }
+
+  details{margin-top:28px;border-top:1px solid var(--line);padding-top:16px;}
+  summary{cursor:pointer;font-weight:600;}
+  details table{border-collapse:collapse;margin-top:14px;font-size:13.5px;width:100%;max-width:560px;}
+  details th,details td{border:1px solid var(--line);padding:6px 10px;text-align:left;}
+  details th{background:#F5F7F9;font-weight:500;}
+  details code{font-family:"IBM Plex Mono",monospace;background:#F5F7F9;padding:1px 4px;}
+  .hidden{display:none;}
+  canvas{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Pixel<span>Vault</span></h1>
+  <p>Lock a message with a password, then hide it inside an image. The picture looks unchanged, and nothing you type ever leaves this device.</p>
+</header>
+
+<div class="tabs" role="tablist">
+  <button id="tabHide" role="tab" aria-selected="true" aria-controls="panelHide">Hide a message</button>
+  <button id="tabReveal" role="tab" aria-selected="false" aria-controls="panelReveal">Reveal a message</button>
+</div>
+
+<!-- ============ HIDE ============ -->
+<section id="panelHide" class="grid" role="tabpanel">
+  <div class="panel">
+    <h2>Your secret</h2>
+
+    <label for="coverFile">Cover image (PNG or JPG, no transparency)</label>
+    <input type="file" id="coverFile" accept="image/png,image/jpeg">
+
+    <label for="messageIn">Message to hide</label>
+    <textarea id="messageIn" placeholder="Type the message you want to protect."></textarea>
+
+    <label for="passHide">Password</label>
+    <input type="password" id="passHide" placeholder="Used to derive the AES key" autocomplete="new-password">
+
+    <button class="action" id="btnHide" disabled>Encrypt and hide</button>
+    <p class="status" id="statusHide"></p>
+    <div class="meter" id="meterWrap"><div id="meterBar"></div></div>
+  </div>
+
+  <div class="panel">
+    <h2>Result</h2>
+    <div class="preview" id="previewHide"><p>Load a cover image to begin.</p></div>
+    <div class="readout" id="readoutHide"></div>
+  </div>
+</section>
+
+<!-- ============ REVEAL ============ -->
+<section id="panelReveal" class="grid hidden" role="tabpanel">
+  <div class="panel">
+    <h2>Stego image</h2>
+
+    <label for="stegoFile">Image containing a hidden message (PNG)</label>
+    <input type="file" id="stegoFile" accept="image/png">
+
+    <label for="passReveal">Password</label>
+    <input type="password" id="passReveal" placeholder="The password used when hiding" autocomplete="current-password">
+
+    <button class="action" id="btnReveal" disabled>Extract and decrypt</button>
+    <p class="status" id="statusReveal"></p>
+
+    <div class="preview" id="previewReveal"><p>Load the image you received.</p></div>
+  </div>
+
+  <div class="panel">
+    <h2>Recovered message</h2>
+    <textarea class="secret" id="messageOut" readonly placeholder="The message appears here once the password checks out."></textarea>
+    <div class="readout" id="readoutReveal"></div>
+  </div>
+</section>
+
+<details>
+  <summary>How one character gets hidden</summary>
+  <p>The letter <code>H</code> is 72, which is <code>01001000</code> in binary. Each of those 8 bits replaces the last bit of one colour value, so every value moves by at most 1 — invisible to the eye.</p>
+  <table>
+    <tr><th>Colour value</th><th>Binary</th><th>Bit hidden</th><th>New value</th></tr>
+    <tr><td>154</td><td>1001101<b>0</b></td><td>0</td><td>154</td></tr>
+    <tr><td>201</td><td>1100100<b>1</b></td><td>1</td><td>201</td></tr>
+    <tr><td>87</td><td>0101011<b>1</b></td><td>0</td><td>86</td></tr>
+    <tr><td>46</td><td>0010111<b>0</b></td><td>0</td><td>46</td></tr>
+    <tr><td>133</td><td>1000010<b>1</b></td><td>1</td><td>133</td></tr>
+    <tr><td>250</td><td>1111101<b>0</b></td><td>0</td><td>250</td></tr>
+    <tr><td>99</td><td>0110001<b>1</b></td><td>0</td><td>98</td></tr>
+    <tr><td>12</td><td>0000110<b>0</b></td><td>0</td><td>12</td></tr>
+  </table>
+  <p>Before any of this happens the message is encrypted with AES-256-GCM, using a key derived from your password with PBKDF2 (SHA-256, 200,000 iterations, 16-byte random salt). What actually enters the pixels is:
+  <code>[4-byte length][16-byte salt][12-byte nonce][ciphertext + 16-byte tag]</code></p>
+</details>
+
+<canvas id="canvas"></canvas>
+</div>
+
+<script>
+/* ============================================================
+   PixelVault — AES-256-GCM encryption + LSB image steganography
+   Runs entirely in the browser. No libraries, no server.
+   ============================================================ */
+
+const ITERATIONS = 200000;   // PBKDF2 rounds — slows down password guessing
+const SALT_LEN   = 16;       // bytes
+const NONCE_LEN  = 12;       // bytes (AES-GCM standard)
+const HEADER_BITS = 32;      // bits used to store the payload length
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+const $ = id => document.getElementById(id);
+const canvas = $("canvas");
+const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+/* ---------- helpers ---------- */
+const hex = bytes => [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+
+function say(el, text, kind) {
+  el.textContent = text;
+  el.className = "status" + (kind ? " " + kind : "");
+}
+
+/* ---------- crypto layer (Web Crypto API) ---------- */
+
+async function deriveKey(password, salt) {
+  const base = await crypto.subtle.importKey(
+    "raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: ITERATIONS, hash: "SHA-256" },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function encryptMessage(message, password) {
+  const salt  = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+  const nonce = crypto.getRandomValues(new Uint8Array(NONCE_LEN));
+  const key   = await deriveKey(password, salt);
+  const cipher = new Uint8Array(await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce }, key, enc.encode(message)
+  ));
+  // payload = salt + nonce + (ciphertext with authentication tag appended)
+  const payload = new Uint8Array(SALT_LEN + NONCE_LEN + cipher.length);
+  payload.set(salt, 0);
+  payload.set(nonce, SALT_LEN);
+  payload.set(cipher, SALT_LEN + NONCE_LEN);
+  return { payload, salt, nonce, cipher };
+}
+
+async function decryptPayload(payload, password) {
+  const salt   = payload.slice(0, SALT_LEN);
+  const nonce  = payload.slice(SALT_LEN, SALT_LEN + NONCE_LEN);
+  const cipher = payload.slice(SALT_LEN + NONCE_LEN);
+  const key    = await deriveKey(password, salt);
+  const plain  = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: nonce }, key, cipher
+  );
+  return { text: dec.decode(plain), salt, nonce, cipher };
+}
+
+/* ---------- steganography layer (Canvas API) ---------- */
+
+// Canvas stores pixels as R,G,B,A. We use R, G and B only — alpha is skipped
+// because editing it would be visible and browsers may alter it.
+function* colourChannels(data) {
+  for (let p = 0; p < data.length; p += 4) {
+    yield p; yield p + 1; yield p + 2;
+  }
+}
+
+function capacityBytes(imageData) {
+  const channels = (imageData.data.length / 4) * 3;
+  return Math.floor((channels - HEADER_BITS) / 8);
+}
+
+function embed(imageData, payload) {
+  const d = imageData.data;
+  const bits = [];
+  for (let i = 31; i >= 0; i--) bits.push((payload.length >>> i) & 1); // length header
+  for (const byte of payload) for (let i = 7; i >= 0; i--) bits.push((byte >> i) & 1);
+
+  const it = colourChannels(d);
+  let changed = 0;
+  for (const bit of bits) {
+    const idx = it.next().value;
+    const newValue = (d[idx] & 0xFE) | bit;   // clear last bit, then set our bit
+    if (newValue !== d[idx]) changed++;
+    d[idx] = newValue;
+  }
+  return { bitsUsed: bits.length, changed };
+}
+
+function extract(imageData) {
+  const d = imageData.data;
+  const it = colourChannels(d);
+
+  let length = 0;
+  for (let i = 0; i < HEADER_BITS; i++) {
+    const n = it.next();
+    if (n.done) throw new Error("This image is too small to hold a message.");
+    length = (length << 1) | (d[n.value] & 1);
+  }
+  length = length >>> 0;
+
+  const minimum = SALT_LEN + NONCE_LEN + 16;           // salt + nonce + GCM tag
+  if (length < minimum || length > capacityBytes(imageData)) {
+    throw new Error("No hidden message found in this image.");
+  }
+
+  const payload = new Uint8Array(length);
+  for (let b = 0; b < length; b++) {
+    let value = 0;
+    for (let i = 0; i < 8; i++) value = (value << 1) | (d[it.next().value] & 1);
+    payload[b] = value;
+  }
+  return payload;
+}
+
+/* ---------- image loading ---------- */
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("That file could not be read as an image."));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error("That file could not be read."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function toImageData(img) {
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  ctx.drawImage(img, 0, 0);
+  return ctx.getImageData(0, 0, canvas.width, canvas.height);
+}
+
+function hasTransparency(imageData) {
+  const d = imageData.data;
+  for (let p = 3; p < d.length; p += 4) if (d[p] !== 255) return true;
+  return false;
+}
+
+function showPreview(box, src, caption) {
+  box.innerHTML = "";
+  const img = new Image();
+  img.src = src;
+  img.alt = caption || "image preview";
+  box.appendChild(img);
+}
+
+/* ---------- tabs ---------- */
+
+function selectTab(name) {
+  const hiding = name === "hide";
+  $("tabHide").setAttribute("aria-selected", hiding);
+  $("tabReveal").setAttribute("aria-selected", !hiding);
+  $("panelHide").classList.toggle("hidden", !hiding);
+  $("panelReveal").classList.toggle("hidden", hiding);
+}
+$("tabHide").onclick = () => selectTab("hide");
+$("tabReveal").onclick = () => selectTab("reveal");
+
+/* ---------- HIDE flow ---------- */
+
+let coverData = null;
+
+$("coverFile").onchange = async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  $("btnHide").disabled = true;
+  $("readoutHide").textContent = "";
+  try {
+    const img = await loadImage(file);
+    coverData = toImageData(img);
+    if (hasTransparency(coverData)) {
+      coverData = null;
+      say($("statusHide"), "This image has transparent areas. Pick a fully opaque image instead.", "err");
+      return;
+    }
+    showPreview($("previewHide"), img.src, "cover image");
+    const cap = capacityBytes(coverData);
+    say($("statusHide"),
+      `${canvas.width} × ${canvas.height} pixels — room for about ${cap.toLocaleString()} bytes.`);
+    $("meterBar").style.width = "0%";
+    $("btnHide").disabled = false;
+  } catch (err) {
+    say($("statusHide"), err.message, "err");
+  }
+};
+
+$("btnHide").onclick = async () => {
+  const message = $("messageIn").value;
+  const password = $("passHide").value;
+  if (!coverData) return say($("statusHide"), "Load a cover image first.", "err");
+  if (!message) return say($("statusHide"), "Type a message to hide.", "err");
+  if (!password) return say($("statusHide"), "Set a password.", "err");
+
+  $("btnHide").disabled = true;
+  say($("statusHide"), "Deriving key and encrypting…");
+
+  try {
+    const t0 = performance.now();
+    const { payload, salt, nonce, cipher } = await encryptMessage(message, password);
+    const cap = capacityBytes(coverData);
+    if (payload.length > cap) {
+      throw new Error(`Message needs ${payload.length} bytes but this image holds ${cap}. Use a larger image.`);
+    }
+
+    // work on a copy so the original pixels stay untouched
+    const working = new ImageData(
+      new Uint8ClampedArray(coverData.data), coverData.width, coverData.height
+    );
+    const { bitsUsed, changed } = embed(working, payload);
+    ctx.putImageData(working, 0, 0);
+    const stegoURL = canvas.toDataURL("image/png");   // PNG keeps every bit intact
+    const elapsed = Math.round(performance.now() - t0);
+
+    showPreview($("previewHide"), stegoURL, "stego image");
+    $("meterBar").style.width = Math.min(100, (payload.length / cap) * 100) + "%";
+
+    $("readoutHide").textContent =
+`message          : ${enc.encode(message).length} bytes
+salt (16 B)      : ${hex(salt)}
+nonce (12 B)     : ${hex(nonce)}
+ciphertext + tag : ${cipher.length} bytes
+payload embedded : ${payload.length} bytes  (${bitsUsed} bits)
+pixels touched   : ${Math.ceil(bitsUsed / 3).toLocaleString()} of ${(canvas.width * canvas.height).toLocaleString()}
+values changed   : ${changed} of ${bitsUsed} (${(changed / bitsUsed * 100).toFixed(1)}%)
+capacity used    : ${(payload.length / cap * 100).toFixed(2)}%
+PBKDF2 + AES time: ${elapsed} ms`;
+
+    const a = document.createElement("a");
+    a.href = stegoURL;
+    a.download = "pixelvault-stego.png";
+    a.click();
+
+    say($("statusHide"), "Hidden. The stego PNG has been downloaded.", "ok");
+  } catch (err) {
+    say($("statusHide"), err.message, "err");
+  } finally {
+    $("btnHide").disabled = false;
+  }
+};
+
+/* ---------- REVEAL flow ---------- */
+
+let stegoData = null;
+
+$("stegoFile").onchange = async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  $("btnReveal").disabled = true;
+  $("messageOut").value = "";
+  $("readoutReveal").textContent = "";
+  try {
+    const img = await loadImage(file);
+    stegoData = toImageData(img);
+    showPreview($("previewReveal"), img.src, "stego image");
+    say($("statusReveal"), `${canvas.width} × ${canvas.height} pixels loaded.`);
+    $("btnReveal").disabled = false;
+  } catch (err) {
+    say($("statusReveal"), err.message, "err");
+  }
+};
+
+$("btnReveal").onclick = async () => {
+  const password = $("passReveal").value;
+  if (!stegoData) return say($("statusReveal"), "Load an image first.", "err");
+  if (!password) return say($("statusReveal"), "Enter the password.", "err");
+
+  $("btnReveal").disabled = true;
+  say($("statusReveal"), "Reading pixels and decrypting…");
+
+  try {
+    const payload = extract(stegoData);              // throws if nothing is hidden
+    const { text, salt, nonce, cipher } = await decryptPayload(payload, password);
+    $("messageOut").value = text;
+    $("readoutReveal").textContent =
+`payload read     : ${payload.length} bytes
+salt (16 B)      : ${hex(salt)}
+nonce (12 B)     : ${hex(nonce)}
+ciphertext + tag : ${cipher.length} bytes
+message recovered: ${enc.encode(text).length} bytes
+authentication   : tag verified`;
+    say($("statusReveal"), "Password accepted. Message recovered.", "ok");
+  } catch (err) {
+    $("messageOut").value = "";
+    const wrongKey = err.name === "OperationError";
+    $("readoutReveal").textContent = wrongKey
+      ? "authentication : tag check FAILED\nreason         : wrong password, or the image was altered"
+      : "";
+    say($("statusReveal"),
+      wrongKey ? "Wrong password, or this image was modified after hiding." : err.message,
+      "err");
+  } finally {
+    $("btnReveal").disabled = false;
+  }
+};
+</script>
+</body>
+</html>
