@@ -130,6 +130,32 @@ Or simply open the [live demo](https://sheshadrimath.github.io/pixelvault/).
 
 ---
 
+## Sharing a stego image safely
+
+The hidden data lives in the least significant bits of the pixels, so the file must be transferred
+**losslessly**. Any platform that recompresses or resizes images will silently destroy the message.
+
+| Method | Survives? |
+|---|---|
+| WhatsApp → attach as **Document** | ✅ Yes |
+| Telegram → send as **File** (compression off) | ✅ Yes |
+| Email attachment | ✅ Yes |
+| Google Drive / OneDrive download | ✅ Yes |
+| USB drive or direct file copy | ✅ Yes |
+| WhatsApp → send as **Photo** | ❌ No — re-encoded to JPEG |
+| Instagram, Facebook, or any social upload | ❌ No — recompressed |
+| Screenshot of the image | ❌ No — pixels are resampled |
+
+On the receiving end, **save the file before opening it**. Opening it in an image editor and
+re-saving (Paint, Photos, or similar) re-encodes the image and destroys the payload.
+
+**Discovered during testing:** a stego image sent through WhatsApp as a photo failed to decode,
+because the platform converts uploads to JPEG to save bandwidth. Re-sending the same file as a
+document attachment worked correctly. This mirrors a real constraint on steganographic channels, and
+is why covert channels in the wild rely on hosts that preserve pixel data exactly.
+
+---
+
 ## Testing
 
 | # | Test | Result |
@@ -140,6 +166,8 @@ Or simply open the [live demo](https://sheshadrimath.github.io/pixelvault/).
 | 4 | Stego PNG re-saved as JPG, then revealed | ✅ Fails — confirms lossless format is required |
 | 5 | Same message + password encrypted twice | ✅ Different salt, nonce and output each time |
 | 6 | Visual comparison of cover vs stego | ✅ No perceptible difference |
+| 7 | Sent via WhatsApp as a photo | ✅ Fails as expected — platform recompression |
+| 8 | Sent via WhatsApp as a document | ✅ Message recovered on the receiving device |
 
 **Sample run** — 14-byte message in a 1280×720 image:
 
@@ -166,6 +194,8 @@ overwrites.
 - Salt and nonce are freshly generated for every operation. A nonce is never reused with the same key.
 - AES-256-GCM provides confidentiality, integrity and authenticity together, so tampering with the
   stego image is detected rather than silently ignored.
+- Because the payload is encrypted before embedding, the stego file can be sent over an untrusted
+  channel: the carrier platform never sees the message content.
 
 ---
 
@@ -178,6 +208,9 @@ This is a teaching implementation, and it is honest about what it does not do:
   equal disclosure, but the concealment itself is not robust.
 - **No robustness to processing.** Any recompression, resizing, cropping or filtering destroys the
   payload.
+- **Cannot survive messaging and social platforms.** Sending the output as a photo through WhatsApp,
+  Instagram or similar services destroys the message, since those platforms recompress images on
+  upload. It must be transferred as a file.
 - **Password strength is the weakest link.** AES-256 cannot be brute-forced; a short password can be.
   PBKDF2's 200,000 iterations slow guessing but cannot rescue a weak password.
 - **Large images are processed on the main thread**, so very large files briefly block the UI.
@@ -206,6 +239,6 @@ This is a teaching implementation, and it is honest about what it does not do:
 
 ## Author
 
-**SHESHADRI MATH**
+**Sheshadri Math**
 B.Tech — Cyber/Computer Forensics and Counterterrorism, Alliance University
 Cryptography micro project, 2026
